@@ -138,10 +138,10 @@
       <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
         <ul class="navbar-nav">
           <li class="nav-item"><a class="nav-link active" href="#">Home</a></li>
-          <li class="nav-item"><a class="nav-link" href="#">About</a></li>
-          <li class="nav-item"><a class="nav-link" href="#">Services</a></li>
-          <li class="nav-item"><a class="nav-link" href="#">Departments</a></li>
-          <li class="nav-item"><a class="nav-link" href="#">Contact</a></li>
+         <li class="nav-item"><a class="nav-link" href="about.php">About</a></li>
+          <li class="nav-item"><a class="nav-link" href="services.php">Services</a></li>
+          <li class="nav-item"><a class="nav-link" href="departments.php">Departments</a></li>
+          <li class="nav-item"><a class="nav-link" href="contact.php">Contact</a></li>
 
           <!-- Login Dropdown -->
           <li class="nav-item dropdown">

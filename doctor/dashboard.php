@@ -1,17 +1,31 @@
 <?php
-session_start();
-require_once '../config/db.php';
+// Enable full error visibility
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-if (!isset($_SESSION['doctor_id'])) {
+session_start();
+require_once '../config/db.php'; // Ensure this file exists and has correct DB credentials
+
+// ✅ Check session variable properly
+if (!isset($_SESSION['doctor_id']) || empty($_SESSION['doctor_id'])) {
     header("Location: doctor_login.php");
     exit;
 }
 
-$doctor_name = $_SESSION['doctor_name'];
-?>
+// ✅ Ensure doctor_name is set
+$doctor_name = isset($_SESSION['doctor_name']) ? $_SESSION['doctor_name'] : 'Doctor';
 
-<?php include 'includes/header.php'; ?>
-<?php include 'includes/sidebar.php'; ?>
+// ✅ Include header and sidebar safely
+$header_path = __DIR__ . '/includes/header.php';
+$sidebar_path = __DIR__ . '/includes/sidebar.php';
+
+if (!file_exists($header_path) || !file_exists($sidebar_path)) {
+    die("<h3 style='color:red;'>Error: Missing include files (header.php or sidebar.php)</h3>");
+}
+
+include $header_path;
+include $sidebar_path;
+?>
 
 <main id="main" class="main">
   <div class="pagetitle">
@@ -38,8 +52,8 @@ $doctor_name = $_SESSION['doctor_name'];
 
       <!-- Features Grid -->
       <div class="col-md-6 col-lg-4">
-        <div class="card info-card">
-          <div class="card-body text-center">
+        <div class="card info-card text-center">
+          <div class="card-body">
             <a href="view_results.php" class="stretched-link text-decoration-none">
               <h5 class="card-title">View Test Results</h5>
               <p class="card-text text-muted">Access patient lab reports</p>
@@ -49,8 +63,8 @@ $doctor_name = $_SESSION['doctor_name'];
       </div>
 
       <div class="col-md-6 col-lg-4">
-        <div class="card info-card">
-          <div class="card-body text-center">
+        <div class="card info-card text-center">
+          <div class="card-body">
             <a href="add_diagnosis.php" class="stretched-link text-decoration-none">
               <h5 class="card-title">Add Diagnosis</h5>
               <p class="card-text text-muted">Record diagnosis notes for patients</p>
@@ -60,8 +74,8 @@ $doctor_name = $_SESSION['doctor_name'];
       </div>
 
       <div class="col-md-6 col-lg-4">
-        <div class="card info-card">
-          <div class="card-body text-center">
+        <div class="card info-card text-center">
+          <div class="card-body">
             <a href="patient_history.php" class="stretched-link text-decoration-none">
               <h5 class="card-title">Patient History</h5>
               <p class="card-text text-muted">Review patient's medical test history</p>
@@ -71,8 +85,8 @@ $doctor_name = $_SESSION['doctor_name'];
       </div>
 
       <div class="col-md-6 col-lg-4">
-        <div class="card info-card">
-          <div class="card-body text-center">
+        <div class="card info-card text-center">
+          <div class="card-body">
             <a href="send_message.php" class="stretched-link text-decoration-none">
               <h5 class="card-title">Send Message</h5>
               <p class="card-text text-muted">Communicate with your patients</p>
@@ -82,8 +96,8 @@ $doctor_name = $_SESSION['doctor_name'];
       </div>
 
       <div class="col-md-6 col-lg-4">
-        <div class="card info-card">
-          <div class="card-body text-center">
+        <div class="card info-card text-center">
+          <div class="card-body">
             <a href="profile.php" class="stretched-link text-decoration-none">
               <h5 class="card-title">My Profile</h5>
               <p class="card-text text-muted">View and update your profile</p>
@@ -93,8 +107,8 @@ $doctor_name = $_SESSION['doctor_name'];
       </div>
 
       <div class="col-md-6 col-lg-4">
-        <div class="card info-card">
-          <div class="card-body text-center">
+        <div class="card info-card text-center">
+          <div class="card-body">
             <a href="change_password.php" class="stretched-link text-decoration-none">
               <h5 class="card-title">Change Password</h5>
               <p class="card-text text-muted">Secure your account</p>

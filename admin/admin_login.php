@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
       </form>
       <div class="login-footer">
         <a href="../index.php">← Back to Home</a> |
-        <a href="#">Recover Password</a>
+        <a href="3">Recover Password</a>
       </div>
     </div>
   </div>
