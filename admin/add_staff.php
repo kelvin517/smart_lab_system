@@ -15,6 +15,7 @@ $message = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['full_name']);
     $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
     $role = trim($_POST['role']);
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
 
@@ -39,13 +40,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Insert into DB
-    $stmt = $conn->prepare("INSERT INTO staff (full_name, email, profile_image, role, password) VALUES (?, ?, ?, ?, ?)");
+    // Insert into DB (with phone)
+    $stmt = $conn->prepare("INSERT INTO staff (full_name, email, phone, profile_image, role, password) VALUES (?, ?, ?, ?, ?, ?)");
     if ($stmt === false) {
         die("Error preparing statement: " . $conn->error);
     }
 
-    $stmt->bind_param("sssss", $name, $email, $profile_image, $role, $password);
+    $stmt->bind_param("ssssss", $name, $email, $phone, $profile_image, $role, $password);
 
     if ($stmt->execute()) {
         $message = "<div class='alert alert-success text-center mt-3'>✅ Staff member added successfully!</div>";
@@ -144,6 +145,11 @@ include 'includes/sidebar.php';
           <div class="col-md-6">
             <label class="form-label fw-semibold">Email</label>
             <input type="email" name="email" class="form-control" placeholder="example@domain.com" required>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">Phone Number</label>
+            <input type="text" name="phone" class="form-control" placeholder="+254712345678" required>
           </div>
 
           <div class="col-md-6">

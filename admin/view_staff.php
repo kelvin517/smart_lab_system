@@ -33,7 +33,7 @@ include 'includes/sidebar.php';
           </thead>
           <tbody>
           <?php
-            $staff = mysqli_query($conn, "SELECT * FROM users WHERE role IN ('doctor', 'technician')");
+            $staff = mysqli_query($conn, "SELECT * FROM staff WHERE role IN ('doctor', 'technician')");
             while ($row = mysqli_fetch_assoc($staff)) {
               echo "<tr>
                 <td>{$row['id']}</td>
