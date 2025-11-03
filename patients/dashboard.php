@@ -21,7 +21,7 @@ $stmt->close();
 
 // ✅ Fetch bookings & test results
 $b = $conn->prepare("
-    SELECT booking_id, test_name, preferred_date, status, result_file 
+    SELECT id AS booking_id, test_name, preferred_date, status, result_file 
     FROM bookings 
     WHERE patient_id = ? 
     ORDER BY preferred_date DESC
