@@ -1,224 +1,134 @@
 <?php
-// patients/pay.php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 session_start();
 include '../config/db.php';
-include '../config/mpesa.php';
-
+include '../config/mpesa_functions.php'; // contains Daraja STK push helper
+include '../includes/mpesa.php';//contains mpesa config
 if (!isset($_SESSION['patient_id'])) {
     header("Location: login.php");
     exit;
 }
 
-$patient_id = (int) $_SESSION['patient_id'];
+$patient_id = $_SESSION['patient_id'];
 $success = $error = '';
 
-if (!isset($_GET['booking_id']) || !is_numeric($_GET['booking_id'])) {
-    $error = "Invalid booking ID.";
-    $booking = null;
-    $billing = null;
-} else {
-    $booking_id = (int) $_GET['booking_id'];
+// Get the latest unpaid booking
+$stmt = $conn->prepare("
+    SELECT b.id AS booking_id, bl.id AS billing_id, bl.amount 
+    FROM bookings b 
+    INNER JOIN billing bl ON bl.booking_id = b.id 
+    WHERE b.patient_id = ? AND bl.status = 'Pending'
+    ORDER BY b.created_at DESC 
+    LIMIT 1
+");
+$stmt->bind_param("i", $patient_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$booking = $result->fetch_assoc();
+$stmt->close();
 
-    $stmt = $conn->prepare("SELECT id, patient_id, test_name, preferred_date, status FROM bookings WHERE id = ? AND patient_id = ?");
-    if (!$stmt) {
-        $error = "Database error: " . $conn->error;
+// Handle payment submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $booking) {
+    $payment_method = $_POST['payment_method'];
+
+    if ($payment_method === 'mpesa') {
+        // M-PESA STK Push
+        $phone = trim($_POST['phone']);
+        if (empty($phone)) {
+            $error = "Please enter your M-PESA phone number.";
+        } else {
+            $response = initiateStkPush($phone, $booking['amount'], $booking['billing_id']);
+            if ($response && isset($response['CheckoutRequestID'])) {
+                $checkoutRequestID = $response['CheckoutRequestID'];
+
+                // Store the checkout request ID for callback tracking
+                $update = $conn->prepare("
+                    UPDATE billing 
+                    SET checkout_request_id = ?, payment_method = 'M-PESA', updated_at = NOW()
+                    WHERE id = ?
+                ");
+                $update->bind_param("si", $checkoutRequestID, $booking['billing_id']);
+                if ($update->execute()) {
+                    $success = "STK Push initiated. Please check your phone and enter M-PESA PIN to complete payment.";
+                } else {
+                    $error = "Database update failed: " . $conn->error;
+                }
+                $update->close();
+            } else {
+                $error = "Failed to initiate M-PESA payment. Please try again.";
+            }
+        }
+
+    } elseif ($payment_method === 'cash') {
+        // Manual cash payment (simulate)
+        $update = $conn->prepare("
+            UPDATE billing 
+            SET status = 'Paid', payment_method = 'Cash', updated_at = NOW()
+            WHERE id = ?
+        ");
+        $update->bind_param("i", $booking['billing_id']);
+        if ($update->execute()) {
+            $success = "Payment recorded successfully as Cash.";
+        } else {
+            $error = "Failed to update payment record.";
+        }
+        $update->close();
+
     } else {
-        $stmt->bind_param("ii", $booking_id, $patient_id);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        $booking = $res ? $res->fetch_assoc() : null;
-        $stmt->close();
-
-        if (!$booking) {
-            $error = "Booking not found or not authorized.";
-        } else {
-            $bstmt = $conn->prepare("SELECT id, amount, status, payment_method, date_paid FROM billing WHERE booking_id = ? ORDER BY id DESC LIMIT 1");
-            $bstmt->bind_param("i", $booking_id);
-            $bstmt->execute();
-            $bres = $bstmt->get_result();
-            $billing = $bres ? $bres->fetch_assoc() : null;
-            $bstmt->close();
-        }
-    }
-}
-
-// Simulated / Cash POST handling
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payment_method'])) {
-    $method = $_POST['payment_method'];
-    if (in_array($method, ['Cash', 'Simulated'])) {
-        $amount = (float)($_POST['amount'] ?? 0);
-        $payment_method = $method;
-
-        if (!empty($billing)) {
-            $update = $conn->prepare("UPDATE billing SET status='Paid', payment_method=?, amount=?, date_paid=NOW() WHERE id=?");
-            $update->bind_param("sdi", $payment_method, $amount, $billing['id']);
-            $update->execute();
-            $success = "Payment marked as paid via $payment_method.";
-        } else {
-            $insert = $conn->prepare("INSERT INTO billing (booking_id, amount, status, payment_method, date_paid, created_at) VALUES (?, ?, 'Paid', ?, NOW(), NOW())");
-            $insert->bind_param("ids", $booking_id, $amount, $payment_method);
-            $insert->execute();
-            $success = "Payment successful ($payment_method).";
-        }
+        $error = "Invalid payment method selected.";
     }
 }
 ?>
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Make Payment — SmartLab</title>
-  <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-  <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
-  <script src="https://checkout.flutterwave.com/v3.js"></script>
-  <style>
-    body { background:#f5f7fa; font-family: Arial, Helvetica, sans-serif; }
-    .container { max-width: 800px; margin: 30px auto; }
-  </style>
-</head>
-<body>
-<div class="container">
-  <h3>Make Payment</h3>
 
-  <?php if ($error): ?>
-    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-  <?php endif; ?>
+<?php include 'includes/header.php'; ?>
+<?php include 'includes/sidebar.php'; ?>
 
-  <?php if ($success): ?>
-    <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
-  <?php endif; ?>
+<main id="main" class="main">
+  <div class="pagetitle">
+    <h1>Make Payment</h1>
+  </div>
 
-  <?php if (!empty($booking)): ?>
-    <div class="card mb-3">
-      <div class="card-body">
-        <p><strong>Booking ID:</strong> <?= htmlspecialchars($booking['id']) ?></p>
-        <p><strong>Test:</strong> <?= htmlspecialchars($booking['test_name']) ?></p>
-        <p><strong>Preferred Date:</strong> <?= htmlspecialchars($booking['preferred_date']) ?></p>
-        <p><strong>Status:</strong> <?= htmlspecialchars($booking['status']) ?></p>
-      </div>
-    </div>
+  <section class="section">
+    <div class="card p-4">
 
-    <?php
-      $display_amount = !empty($billing['amount']) ? (float)$billing['amount'] : 1000.00;
-    ?>
+      <?php if ($success): ?>
+        <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
+      <?php elseif ($error): ?>
+        <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+      <?php endif; ?>
 
-    <div class="card mb-3">
-      <div class="card-body">
-        <h5>Payment Options</h5>
-        <form id="paymentForm" method="POST" class="row g-3">
-          <input type="hidden" name="booking_id" id="booking_id" value="<?= $booking['id'] ?>">
+      <?php if (!empty($booking) && !$success): ?>
+        <h5 class="mb-3">Booking ID: <?= htmlspecialchars($booking['booking_id']) ?></h5>
+        <p>Amount Due: <strong>KES <?= number_format((float)$booking['amount'], 2) ?></strong></p>
 
-          <div class="col-md-6">
-            <label class="form-label">Payment Method</label>
+        <form method="POST">
+          <div class="mb-3">
+            <label for="payment_method" class="form-label">Select Payment Method</label>
             <select name="payment_method" id="payment_method" class="form-select" required>
-              <option value="">Select method</option>
-              <option value="Mpesa">Mpesa (STK Push)</option>
-              <option value="Card">Card (Flutterwave)</option>
-              <option value="Cash">Cash (Manual)</option>
-              <option value="Simulated">Simulated</option>
+              <option value="">-- Select Payment Method --</option>
+              <option value="mpesa">M-PESA (STK Push)</option>
+              <option value="cash">Cash (Manual Payment)</option>
             </select>
           </div>
 
-          <div class="col-md-6">
-            <label class="form-label">Amount (KES)</label>
-            <input type="number" step="0.01" name="amount" id="amount" class="form-control" value="<?= number_format($display_amount, 2, '.', '') ?>">
+          <div id="mpesa-fields" style="display:none;">
+            <div class="mb-3">
+              <label for="phone" class="form-label">M-PESA Phone Number (e.g. 2547XXXXXXXX)</label>
+              <input type="text" name="phone" id="phone" class="form-control" placeholder="Enter your M-PESA number">
+            </div>
           </div>
 
-          <div class="col-md-12" id="mpesa_phone_field" style="display:none;">
-            <label class="form-label">Phone Number (07XXXXXXXX)</label>
-            <input type="text" name="phone" id="phone" class="form-control" placeholder="07XXXXXXXX">
-          </div>
-
-          <div class="col-12">
-            <button type="button" id="payNowBtn" class="btn btn-success"><i class="bi bi-check-circle"></i> Pay Now</button>
-            <a href="book_test.php" class="btn btn-secondary ms-2">Back</a>
-          </div>
+          <button type="submit" class="btn btn-success">Proceed to Pay</button>
+          <a href="book_test.php" class="btn btn-secondary ms-2">Back</a>
         </form>
-      </div>
+      <?php endif; ?>
+
     </div>
-  <?php endif; ?>
-</div>
+  </section>
+</main>
 
-<script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
 <script>
-const payNowBtn = document.getElementById('payNowBtn');
-const methodSelect = document.getElementById('payment_method');
-const phoneField = document.getElementById('mpesa_phone_field');
-const flutterwaveKey = "FLWPUBK_TEST-xxxxxxxxxxxxxxxxxxxxx-X"; // Replace with your Flutterwave public key
-
-methodSelect.addEventListener('change', function() {
-  phoneField.style.display = this.value === 'Mpesa' ? 'block' : 'none';
-});
-
-payNowBtn.addEventListener('click', function() {
-  const method = methodSelect.value;
-  const formData = new FormData(document.getElementById('paymentForm'));
-  const amount = document.getElementById('amount').value;
-  const phone = document.getElementById('phone')?.value;
-  const booking_id = document.getElementById('booking_id').value;
-
-  if (!method) {
-    alert("Please select a payment method.");
-    return;
-  }
-
-  if (method === 'Mpesa') {
-    if (!phone || !phone.startsWith("07")) {
-      alert("Enter a valid Mpesa phone number.");
-      return;
-    }
-    fetch('mpesa_api.php', {
-      method: 'POST',
-      body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.ResponseDescription) {
-        alert('Check your phone to complete the payment.');
-      } else {
-        alert('Error: ' + JSON.stringify(data));
-      }
-    });
-  }
-  else if (method === 'Card') {
-    FlutterwaveCheckout({
-      public_key: flutterwaveKey,
-      tx_ref: "SmartLab-" + Date.now(),
-      amount: parseFloat(amount),
-      currency: "KES",
-      payment_options: "card",
-      customer: {
-        email: "<?= $_SESSION['patient_email'] ?? 'test@smartlab.com' ?>",
-        phone_number: phone || "0712345678",
-        name: "<?= $_SESSION['patient_name'] ?? 'SmartLab Patient' ?>",
-      },
-      callback: function (response) {
-        if (response.status === "successful") {
-          alert("Payment successful!");
-          fetch("update_payment.php", {
-            method: "POST",
-            headers: {"Content-Type": "application/x-www-form-urlencoded"},
-            body: "booking_id=" + booking_id + "&amount=" + amount + "&method=Card"
-          });
-        } else {
-          alert("Payment failed or cancelled.");
-        }
-      },
-      customizations: {
-        title: "Smart Laboratory System",
-        description: "Lab Test Payment",
-        logo: "../assets/img/logo.png",
-      },
-    });
-  }
-  else {
-    // Cash / Simulated
-    document.getElementById('paymentForm').submit();
-  }
-});
+  document.getElementById('payment_method').addEventListener('change', function() {
+    const mpesaFields = document.getElementById('mpesa-fields');
+    mpesaFields.style.display = (this.value === 'mpesa') ? 'block' : 'none';
+  });
 </script>
-</body>
-</html>
