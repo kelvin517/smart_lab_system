@@ -16,9 +16,9 @@
     </li>
 
     <li class="nav-item">
-      <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'my_results.php' ? '' : 'collapsed' ?>" href="my_results.php">
+      <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'results.php' ? '' : 'collapsed' ?>" href="results.php">
         <i class="bi bi-file-earmark-text"></i>
-        <span>My Results</span>
+        <span>Results</span>
       </a>
     </li>
 

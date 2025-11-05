@@ -77,7 +77,7 @@ $ai_recs = [
     .card { border: none; border-radius: 10px; box-shadow: 0 3px 8px rgba(0,0,0,0.05); }
     .card-header { font-weight: 600; }
     .profile-img {
-      width: 70px; height: 70px; border-radius: 50%;
+      width: 60px; height: 60px; border-radius: 50%;
       background: #ddd url('../assets/img/profile.png') center/cover no-repeat;
     }
   </style>
@@ -91,10 +91,10 @@ $ai_recs = [
   </div>
   <a href="dashboard.php" class="active"><i class="bi bi-speedometer2"></i> Dashboard</a>
   <a href="book_test.php"><i class="bi bi-journal-plus"></i> Book Test</a>
-  <a href="view_results.php"><i class="bi bi-file-earmark-medical"></i> View Results</a>
+  <a href="results.php"><i class="bi bi-file-earmark-medical"></i>Results</a>
   <a href="messages.php"><i class="bi bi-chat-dots"></i> Messages</a>
   <a href="feedback.php"><i class="bi bi-star"></i> Feedback</a>
-  <a href="patient_profile.php"><i class="bi bi-person"></i> Profile</a>
+  <a href="profile.php"><i class="bi bi-person"></i> Profile</a>
   <a href="logout.php" class="text-danger"><i class="bi bi-box-arrow-right"></i> Logout</a>
 </div>
 
@@ -109,7 +109,7 @@ $ai_recs = [
         <span><?= htmlspecialchars($patient['full_name']) ?></span>
       </a>
       <ul class="dropdown-menu dropdown-menu-end">
-        <li><a class="dropdown-item" href="patient_profile.php"><i class="bi bi-person"></i> My Profile</a></li>
+        <li><a class="dropdown-item" href="profile.php"><i class="bi bi-person"></i> my Profile</a></li>
         <li><a class="dropdown-item text-danger" href="logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
       </ul>
     </div>
