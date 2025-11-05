@@ -127,7 +127,7 @@ $ai_recs = [
         <div class="card-body">
           <p><strong>Email:</strong> <?= htmlspecialchars($patient['email']) ?></p>
           <p><strong>Phone:</strong> <?= htmlspecialchars($patient['phone']) ?></p>
-          <a href="patient_profile.php" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Edit</a>
+          <a href="profile.php" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Edit</a>
         </div>
       </div>
 
