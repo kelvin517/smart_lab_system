@@ -1,9 +1,13 @@
 <?php
-// ==============================
-// Smart Laboratory Admin Dashboard
-// ==============================
+// =============================================
+// SMART LABORATORY SYSTEM - ADMIN DASHBOARD
+// =============================================
 session_start();
 include '../config/db.php';
+
+// ✅ Enable error reporting (remove in production)
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 // ✅ Redirect if not logged in
 if (!isset($_SESSION['admin_id'])) {
@@ -11,16 +15,30 @@ if (!isset($_SESSION['admin_id'])) {
     exit();
 }
 
-// ✅ Fetch admin details
 $admin_id = $_SESSION['admin_id'];
-$admin_query = $conn->query("SELECT full_name, email FROM admins WHERE id = '$admin_id' LIMIT 1");
-$admin = $admin_query ? $admin_query->fetch_assoc() : ['full_name' => 'Administrator', 'email' => ''];
 
-// ✅ Fetch statistics
-$total_patients = $conn->query("SELECT COUNT(*) AS total FROM patients")->fetch_assoc()['total'] ?? 0;
-$total_doctors = $conn->query("SELECT COUNT(*) AS total FROM doctors")->fetch_assoc()['total'] ?? 0;
-$total_technicians = $conn->query("SELECT COUNT(*) AS total FROM technicians")->fetch_assoc()['total'] ?? 0;
-$total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch_assoc()['total'] ?? 0;
+// ✅ Fetch admin details securely
+$stmt = $conn->prepare("SELECT full_name, email FROM admins WHERE id = ? LIMIT 1");
+$stmt->bind_param("i", $admin_id);
+$stmt->execute();
+$admin = $stmt->get_result()->fetch_assoc();
+$stmt->close();
+
+if (!$admin) {
+    $admin = ['full_name' => 'Administrator', 'email' => ''];
+}
+
+// ✅ Fetch system statistics (with fallbacks)
+function fetch_count($conn, $table) {
+    $query = $conn->query("SELECT COUNT(*) AS total FROM $table");
+    return ($query && $row = $query->fetch_assoc()) ? $row['total'] : 0;
+}
+
+$total_patients     = fetch_count($conn, 'patients');
+$total_doctors      = fetch_count($conn, 'doctors');
+$total_technicians  = fetch_count($conn, 'technicians');
+$total_tests        = fetch_count($conn, 'test_results');
+
 ?>
 
 <?php include 'includes/header.php'; ?>
@@ -28,7 +46,6 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
 
 <main id="main" class="main">
 
-  <!-- Page Title -->
   <div class="pagetitle">
     <h1>Admin Dashboard</h1>
     <nav>
@@ -42,17 +59,18 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
   <section class="section dashboard">
     <div class="row">
 
-      <!-- Welcome Card -->
+      <!-- Welcome Banner -->
       <div class="col-12">
-        <div class="alert alert-primary shadow-sm">
-          <strong>Welcome, <?= htmlspecialchars($admin['full_name']); ?>!</strong>  
-          Manage your Smart Laboratory operations from this dashboard.
+        <div class="alert alert-primary shadow-sm fade show">
+          <i class="bi bi-person-check-fill me-2"></i>
+          <strong>Welcome back, <?= htmlspecialchars($admin['full_name']); ?>!</strong> 
+          Manage users, results, and operations from this dashboard.
         </div>
       </div>
 
-      <!-- Patients Card -->
-      <div class="col-lg-3 col-md-6">
-        <div class="card info-card customers-card">
+      <!-- Stats Cards -->
+      <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card info-card">
           <div class="card-body">
             <h5 class="card-title">Patients <span>| Registered</span></h5>
             <div class="d-flex align-items-center">
@@ -68,9 +86,8 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
         </div>
       </div>
 
-      <!-- Doctors Card -->
-      <div class="col-lg-3 col-md-6">
-        <div class="card info-card sales-card">
+      <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card info-card">
           <div class="card-body">
             <h5 class="card-title">Doctors <span>| Active</span></h5>
             <div class="d-flex align-items-center">
@@ -79,16 +96,15 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
               </div>
               <div class="ps-3">
                 <h6><?= $total_doctors; ?></h6>
-                <span class="text-muted small">Available Doctors</span>
+                <span class="text-muted small">Registered Doctors</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Technicians Card -->
-      <div class="col-lg-3 col-md-6">
-        <div class="card info-card revenue-card">
+      <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card info-card">
           <div class="card-body">
             <h5 class="card-title">Technicians <span>| Lab Staff</span></h5>
             <div class="d-flex align-items-center">
@@ -97,16 +113,15 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
               </div>
               <div class="ps-3">
                 <h6><?= $total_technicians; ?></h6>
-                <span class="text-muted small">Registered Technicians</span>
+                <span class="text-muted small">Lab Technicians</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Test Results Card -->
-      <div class="col-lg-3 col-md-6">
-        <div class="card info-card customers-card">
+      <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card info-card">
           <div class="card-body">
             <h5 class="card-title">Test Results <span>| Completed</span></h5>
             <div class="d-flex align-items-center">
@@ -124,18 +139,18 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
 
     </div><!-- End Stats Row -->
 
-    <!-- Recent Login Activity -->
+    <!-- Recent Logins -->
     <div class="row mt-4">
       <div class="col-lg-12">
         <div class="card recent-sales overflow-auto">
           <div class="card-body">
-            <h5 class="card-title">Recent Logins <span>| Last 10 Records</span></h5>
+            <h5 class="card-title">Recent Logins <span>| Last 10</span></h5>
 
-            <table class="table table-borderless datatable">
+            <table class="table table-borderless datatable align-middle">
               <thead>
                 <tr>
                   <th scope="col">#</th>
-                  <th scope="col">User</th>
+                  <th scope="col">Username</th>
                   <th scope="col">Role</th>
                   <th scope="col">Email</th>
                   <th scope="col">Login Time</th>
@@ -144,22 +159,20 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
               <tbody>
                 <?php
                 $i = 1;
-                $logs = $conn->query("SELECT * FROM login_logs ORDER BY login_time DESC LIMIT 10");
+                $logs = $conn->query("SELECT username, role, email, login_time FROM login_logs ORDER BY login_time DESC LIMIT 10");
                 if ($logs && $logs->num_rows > 0) {
-                  while ($row = $logs->fetch_assoc()) {
-                    echo "
-                      <tr>
-                        <th scope='row'>{$i}</th>
-                        <td>{$row['username']}</td>
-                        <td>{$row['role']}</td>
-                        <td>{$row['email']}</td>
-                        <td>{$row['login_time']}</td>
-                      </tr>
-                    ";
-                    $i++;
-                  }
+                    while ($row = $logs->fetch_assoc()) {
+                        echo "<tr>
+                            <th scope='row'>{$i}</th>
+                            <td>" . htmlspecialchars($row['username']) . "</td>
+                            <td><span class='badge bg-info text-dark'>" . htmlspecialchars($row['role']) . "</span></td>
+                            <td>" . htmlspecialchars($row['email']) . "</td>
+                            <td>" . htmlspecialchars($row['login_time']) . "</td>
+                        </tr>";
+                        $i++;
+                    }
                 } else {
-                  echo "<tr><td colspan='5'>No recent login records found.</td></tr>";
+                    echo "<tr><td colspan='5' class='text-center text-muted'>No recent login activity.</td></tr>";
                 }
                 ?>
               </tbody>
@@ -171,7 +184,4 @@ $total_tests = $conn->query("SELECT COUNT(*) AS total FROM test_results")->fetch
     </div>
 
   </section>
-
 </main>
-
-<?php include 'includes/footer.php'; ?>
