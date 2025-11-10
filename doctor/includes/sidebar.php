@@ -22,14 +22,7 @@
       </a>
     </li>
 
-    <li class="nav-item">
-      <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'send_message.php' ? '' : 'collapsed' ?>" href="send_message.php">
-        <i class="bi bi-chat-dots"></i>
-        <span>Send Message</span>
-      </a>
-    </li>
-
-    <li class="nav-item">
+        <li class="nav-item">
       <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'messages.php' ? '' : 'collapsed' ?>" href="messages.php">
         <i class="bi bi-envelope"></i>
         <span>Inbox / Outbox</span>
