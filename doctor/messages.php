@@ -223,12 +223,12 @@ $unread_count = $unread_result ? $unread_result->fetch_assoc()['count'] : 0;
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="lab_results.php">
+                            <a class="nav-link" href="view_results.php">
                                 <i class="bi bi-clipboard-data"></i> Lab Results
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="prescriptions.php">
+                            <a class="nav-link" href="add_diagnosis.php">
                                 <i class="bi bi-prescription"></i> Prescriptions
                             </a>
                         </li>
