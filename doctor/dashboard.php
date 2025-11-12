@@ -174,7 +174,7 @@ include $sidebar_path;
     <div class="collapse navbar-collapse justify-content-end" id="doctorNavbar">
       <ul class="navbar-nav align-items-center">
         <li class="nav-item">
-          <a class="nav-link" href="send_message.php"><i class="bi bi-envelope me-1"></i> Messages</a>
+          <a class="nav-link" href="messages.php"><i class="bi bi-envelope me-1"></i> Messages</a>
         </li>
         <li class="nav-item">
           <a class="nav-link" href="reports.php"><i class="bi bi-bar-chart-line me-1"></i> Reports</a>
@@ -234,7 +234,7 @@ include $sidebar_path;
       <div class="icon text-warning"><i class="bi bi-chat-dots"></i></div>
       <h5>Messages</h5>
       <p>Chat with patients or respond to messages.</p>
-      <a href="send_message.php" class="btn btn-outline-warning btn-sm mt-2">Open</a>
+      <a href="messages.php" class="btn btn-outline-warning btn-sm mt-2">Open</a>
     </div>
 
     <div class="dash-card">
