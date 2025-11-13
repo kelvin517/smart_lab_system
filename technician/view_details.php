@@ -1,4 +1,7 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
 require_once '../config/db.php';
 
@@ -18,7 +21,7 @@ $success = $error = '';
 $stmt = $conn->prepare("
     SELECT b.*, p.full_name, p.email, p.phone, p.gender 
     FROM bookings b 
-    JOIN patients p ON b.patient_id = p.id 
+    JOIN patients p ON b.patient_id = p.patient_id 
     WHERE b.id = ?
 ");
 $stmt->bind_param("i", $booking_id);
@@ -87,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <li class="list-group-item"><strong>Email:</strong> <?= htmlspecialchars($details['email']) ?></li>
             <li class="list-group-item"><strong>Phone:</strong> <?= htmlspecialchars($details['phone']) ?></li>
             <li class="list-group-item"><strong>Gender:</strong> <?= htmlspecialchars($details['gender']) ?></li>
-            <li class="list-group-item"><strong>Test Type:</strong> <?= htmlspecialchars($details['test_type']) ?></li>
+            <li class="list-group-item"><strong>Test Type:</strong> <?= htmlspecialchars($details['test_name']) ?></li>
             <li class="list-group-item"><strong>Preferred Date:</strong> <?= htmlspecialchars($details['preferred_date']) ?></li>
             <li class="list-group-item"><strong>Status:</strong> <?= htmlspecialchars($details['status']) ?></li>
             <li class="list-group-item"><strong>Result File:</strong>

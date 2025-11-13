@@ -1,6 +1,9 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
-include 'config/db.php';
+include '../config/db.php';
 
 $error = '';
 
@@ -9,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = trim($_POST['password']);
 
     // Ensure correct role and email match
-    $stmt = $conn->prepare("SELECT id, full_name, password FROM users WHERE email = ? AND role = 'technician'");
+    $stmt = $conn->prepare("SELECT id, full_name, password FROM staff WHERE email = ? AND role = 'technician'");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $stmt->store_result();
