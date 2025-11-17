@@ -1,8 +1,13 @@
 <?php
 session_start();
-session_unset();
-session_destroy();
 
-// Redirect to technician login page
-header("Location: /Smart-Laboratory/technician/login_technician.php");
+// Destroy all technician session variables
+if (isset($_SESSION['technician_id'])) {
+    session_unset();
+    session_destroy();
+}
+
+// Redirect to login page
+header("Location: login_technician.php");
 exit;
+?>
