@@ -458,11 +458,11 @@ $system_alerts = $conn->query("SELECT message, level, created_at FROM system_ale
                                 </a>
                             </div>
                             <div class="col-md-3 col-6">
-                                <a href="view_staff.php" class="action-btn">
+                                <a href="analytics.php" class="action-btn">
                                     <i class="fas fa-cogs text-success"></i>
                                     <div>
-                                        <strong>Manage Users</strong>
-                                        <small class="d-block text-muted">Staff management</small>
+                                        <strong>Analytics</strong>
+                                        <small class="d-block text-muted">view analysis</small>
                                     </div>
                                 </a>
                             </div>
@@ -471,7 +471,7 @@ $system_alerts = $conn->query("SELECT message, level, created_at FROM system_ale
                                     <i class="fas fa-chart-pie text-info"></i>
                                     <div>
                                         <strong>Reports</strong>
-                                        <small class="d-block text-muted">Generate analytics</small>
+                                        <small class="d-block text-muted">view reports</small>
                                     </div>
                                 </a>
                             </div>

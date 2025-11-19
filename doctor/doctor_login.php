@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Please enter both email and password.";
     } else {
         // Prepare the query
-        $stmt = $conn->prepare("SELECT id, full_name, password FROM staff WHERE email = ?");
+        $stmt = $conn->prepare("SELECT id, full_name, password, email FROM staff WHERE email = ?");
         if (!$stmt) {
             die("Database error: " . $conn->error);
         }
@@ -32,13 +32,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->store_result();
 
         if ($stmt->num_rows === 1) {
-            $stmt->bind_result($doctor_id, $doctor_name, $hashed_password);
+            $stmt->bind_result($doctor_id, $doctor_name, $hashed_password, $doctor_email);
             $stmt->fetch();
 
             // Verify password
             if (password_verify($password, $hashed_password)) {
                 $_SESSION['doctor_id'] = $doctor_id;
                 $_SESSION['doctor_name'] = $doctor_name;
+                
+                // After successful login, log the activity
+                $username = $doctor_name;
+                $role = 'doctor';
+                $email = $doctor_email;
+                $ip_address = $_SERVER['REMOTE_ADDR'];
+                $user_agent = $_SERVER['HTTP_USER_AGENT'];
+                
+                // First, ensure the login_logs table exists
+                $create_table = $conn->query("
+                    CREATE TABLE IF NOT EXISTS login_logs (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        username VARCHAR(100) NOT NULL,
+                        role ENUM('admin', 'doctor', 'technician', 'patient') NOT NULL,
+                        email VARCHAR(255) NOT NULL,
+                        login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        ip_address VARCHAR(45),
+                        user_agent TEXT
+                    )
+                ");
+                
+                $log_stmt = $conn->prepare("INSERT INTO login_logs (username, role, email, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)");
+                $log_stmt->bind_param("sssss", $username, $role, $email, $ip_address, $user_agent);
+                $log_stmt->execute();
+                $log_stmt->close();
+                
                 header("Location: dashboard.php");
                 exit;
             } else {
