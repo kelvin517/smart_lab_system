@@ -1,8 +1,13 @@
 <?php
 session_start();
+
+// Clear all session data
 session_unset();
 session_destroy();
 
-// Redirect to login page (full path)
-header("Location: http://localhost/Smart-Laboratory/admin/admin_login.php");
+// Prevent session reuse
+session_write_close();
+
+// Redirect to admin login
+header("Location: admin_login.php");
 exit();
