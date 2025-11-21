@@ -60,10 +60,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     )
                 ");
                 
-                $log_stmt = $conn->prepare("INSERT INTO login_logs (username, role, email, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)");
-                $log_stmt->bind_param("sssss", $username, $role, $email, $ip_address, $user_agent);
-                $log_stmt->execute();
-                $log_stmt->close();
+               $ip = $_SERVER['REMOTE_ADDR'];
+
+// Insert login log
+$stmt_log = $conn->prepare("
+    INSERT INTO login_logs (username, role, email, ip_address)
+    VALUES (?, ?, ?, ?)
+");
+$stmt_log->bind_param("ssss", $username, $role, $email, $ip);
+$stmt_log->execute();
+
                 
                 header("Location: dashboard.php");
                 exit;

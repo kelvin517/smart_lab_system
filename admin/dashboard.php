@@ -33,10 +33,16 @@ function fetch_count($conn, $table) {
     $query = $conn->query("SELECT COUNT(*) AS total FROM $table");
     return ($query && $row = $query->fetch_assoc()) ? $row['total'] : 0;
 }
+// Count Doctors
+$query_doctors = $conn->query("SELECT COUNT(*) AS total FROM staff WHERE role='doctor'");
+$total_doctors = $query_doctors->fetch_assoc()['total'];
+
+// Count Technicians
+$query_tech = $conn->query("SELECT COUNT(*) AS total FROM staff WHERE role='technician'");
+$total_technicians = $query_tech->fetch_assoc()['total'];
+
 
 $total_patients     = fetch_count($conn, 'patients');
-$total_doctors      = fetch_count($conn, 'doctors');
-$total_technicians  = fetch_count($conn, 'technicians');
 $total_tests        = fetch_count($conn, 'test_results');
 
 // Fetch recent appointments

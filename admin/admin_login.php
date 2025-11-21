@@ -18,6 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         echo "<script>alert('Invalid credentials');</script>";
     }
+    $ip = $_SERVER['REMOTE_ADDR'];
+
+// Insert login log
+$stmt_log = $conn->prepare("
+    INSERT INTO login_logs (username, role, email, ip_address)
+    VALUES (?, ?, ?, ?)
+");
+$stmt_log->bind_param("ssss", $username, $role, $email, $ip);
+$stmt_log->execute();
+
 }
 ?>
 <!DOCTYPE html>
