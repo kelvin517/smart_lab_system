@@ -587,23 +587,35 @@ $system_alerts = $conn->query("SELECT message, level, created_at FROM system_ale
                                     </thead>
                                     <tbody>
                                         <?php
-                                        $i = 1;
-                                        $logs = $conn->query("SELECT username, role, email, login_time FROM login_logs ORDER BY login_time DESC LIMIT 10");
-                                        if ($logs && $logs->num_rows > 0) {
-                                            while ($row = $logs->fetch_assoc()) {
-                                                echo "<tr>
-                                                    <th scope='row'>{$i}</th>
-                                                    <td>" . htmlspecialchars($row['username']) . "</td>
-                                                    <td><span class='badge bg-info'>" . htmlspecialchars($row['role']) . "</span></td>
-                                                    <td>" . htmlspecialchars($row['email']) . "</td>
-                                                    <td>" . date('M j, g:i A', strtotime($row['login_time'])) . "</td>
-                                                </tr>";
-                                                $i++;
-                                            }
-                                        } else {
-                                            echo "<tr><td colspan='5' class='text-center text-muted py-4'>No recent login activity.</td></tr>";
-                                        }
-                                        ?>
+$i = 1;
+$logs = $conn->query("SELECT username, role, email, login_time FROM login_logs ORDER BY login_time DESC LIMIT 10");
+
+if ($logs && $logs->num_rows > 0) {
+    while ($row = $logs->fetch_assoc()) {
+
+        $username = htmlspecialchars($row['username'] ?? 'Unknown');
+        $role = htmlspecialchars($row['role'] ?? 'N/A');
+        $email = htmlspecialchars($row['email'] ?? 'Not provided');
+
+        // login_time fallback
+        $login_time = !empty($row['login_time'])
+            ? date('M j, g:i A', strtotime($row['login_time']))
+            : 'Unknown';
+
+        echo "<tr>
+                <th scope='row'>{$i}</th>
+                <td>{$username}</td>
+                <td><span class='badge bg-info'>{$role}</span></td>
+                <td>{$email}</td>
+                <td>{$login_time}</td>
+              </tr>";
+        $i++;
+    }
+} else {
+    echo "<tr><td colspan='5' class='text-center text-muted py-4'>No recent login activity.</td></tr>";
+}
+?>
+
                                     </tbody>
                                 </table>
                             </div>

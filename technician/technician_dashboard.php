@@ -40,20 +40,23 @@ for ($i = 9; $i <= 17; $i++) {
 // Next 4 appointments
 $sql = "
     SELECT b.*, p.full_name, p.patient_id, p.phone, p.email
-    FROM bookings b 
-    JOIN patients p ON b.patient_id = p.patient_id 
+    FROM bookings b
+    JOIN patients p ON b.patient_id = p.patient_id
     WHERE b.status = 'pending'
-    ORDER BY b.preferred_date ASC 
+    ORDER BY b.preferred_date ASC, b.appointment_time ASC
     LIMIT 4
 ";
 $result = $conn->query($sql);
+
 $appointments = [];
-if ($result) {
+if ($result && $result->num_rows > 0) {
     while ($row = $result->fetch_assoc()) {
         $appointments[] = $row;
     }
 }
+
 $next = $appointments[0] ?? null;
+
 
 // Pending tests count
 $pendingTestsQuery = $conn->query("SELECT COUNT(*) as count FROM bookings WHERE status = 'pending'");
@@ -82,371 +85,828 @@ if ($activitiesQuery) {
         $recentActivities[] = $row;
     }
 }
+
+// Weekly stats for line chart
+$weeklyData = [];
+for ($i = 6; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-$i days"));
+    $dayName = date('D', strtotime($date));
+    
+    $query = $conn->query("SELECT COUNT(*) as count FROM bookings WHERE DATE(preferred_date) = '$date'");
+    $count = $query ? $query->fetch_assoc()['count'] : 0;
+    
+    $weeklyData['labels'][] = $dayName;
+    $weeklyData['data'][] = $count;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Technician Dashboard - Smart Lab System</title>
+  <title>Lab Technician Dashboard - Hospital Management System</title>
   <link href="../assets/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
   <link href="../assets/vendor/bootstrap-icons/bootstrap-icons.css" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
-      --primary: #2c3e50;
-      --secondary: #3498db;
-      --success: #27ae60;
-      --warning: #f39c12;
-      --danger: #e74c3c;
-      --light: #ecf0f1;
-      --dark: #34495e;
+      --primary: #1a73e8;
+      --primary-dark: #0d47a1;
+      --primary-light: #4285f4;
+      --secondary: #34a853;
+      --accent: #fbbc05;
+      --danger: #ea4335;
+      --warning: #f29900;
+      --info: #4285f4;
+      --dark: #202124;
+      --light: #f8f9fa;
+      --gray: #5f6368;
+      --border: #e8eaed;
+      --sidebar: #1e293b;
+      --sidebar-hover: #334155;
+      --card-bg: rgba(255, 255, 255, 0.95);
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
     }
     
     body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       background-attachment: fixed;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      min-height: 100vh;
+      color: var(--dark);
+      line-height: 1.6;
+    }
+
+    .dashboard-container {
+      display: flex;
       min-height: 100vh;
     }
-    
-    .dashboard-card {
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--sidebar);
+      color: white;
+      position: fixed;
+      height: 100vh;
+      overflow-y: auto;
+      transition: all 0.3s ease;
+      z-index: 1000;
+    }
+
+    .sidebar-header {
+      padding: 25px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      background: rgba(0,0,0,0.2);
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sidebar-brand i {
+      font-size: 1.8rem;
+      color: var(--primary-light);
+    }
+
+    .sidebar-brand h3 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin: 0;
+    }
+
+    .sidebar-menu {
+      padding: 20px 0;
+    }
+
+    .nav-item {
+      margin-bottom: 5px;
+    }
+
+    .nav-link {
+      color: rgba(255,255,255,0.8);
+      padding: 12px 25px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.3s ease;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-link:hover, .nav-link.active {
+      background: var(--sidebar-hover);
+      color: white;
+      border-left-color: var(--primary-light);
+    }
+
+    .nav-link i {
+      font-size: 1.1rem;
+      width: 20px;
+      text-align: center;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      margin-left: 260px;
+      padding: 20px;
+      background: #f5f7fa;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      background: white;
       border-radius: 15px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-      border: none;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-      overflow: hidden;
+      padding: 15px 25px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: between;
+      align-items: center;
+    }
+
+    .welcome-section h1 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--dark);
+      margin-bottom: 5px;
+    }
+
+    .welcome-section p {
+      color: var(--gray);
+      margin: 0;
+    }
+
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 900px;
+    }
+
+    .notification-badge {
+      position: relative;
+    }
+
+    .badge-count {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      background: var(--danger);
+      color: white;
+      border-radius: 50%;
+      width: 18px;
+      height: 18px;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
       margin-bottom: 25px;
     }
-    
-    .dashboard-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
-    }
-    
-    .card-header {
-      background: linear-gradient(to right, var(--primary), var(--dark));
-      color: white;
-      border-bottom: none;
-      padding: 15px 20px;
-      font-weight: 600;
-    }
-    
+
     .stat-card {
-      text-align: center;
-      padding: 20px 15px;
-      border-radius: 12px;
-      color: white;
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(to right, var(--primary), var(--secondary));
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+    }
+
+    .stat-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      margin-bottom: 15px;
+    }
+
+    .pending .stat-icon { background: rgba(234, 67, 53, 0.1); color: var(--danger); }
+    .completed .stat-icon { background: rgba(52, 168, 83, 0.1); color: var(--secondary); }
+    .urgent .stat-icon { background: rgba(251, 188, 5, 0.1); color: var(--warning); }
+
+    .stat-content h3 {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 5px;
+      color: var(--dark);
+    }
+
+    .stat-content p {
+      color: var(--gray);
+      margin: 0;
+      font-weight: 500;
+    }
+
+    .trend {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.85rem;
+      margin-top: 8px;
+    }
+
+    .trend.up { color: var(--secondary); }
+    .trend.down { color: var(--danger); }
+
+    /* Dashboard Grid */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 25px;
+      margin-bottom: 25px;
+    }
+
+    .grid-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-header h3 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--dark);
+      margin: 0;
+    }
+
+    .view-all {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.9rem;
+    }
+
+    /* Next Patient Card */
+    .next-patient {
+      grid-column: 1;
+      grid-row: 1;
+    }
+
+    .patient-info {
+      display: flex;
+      align-items: center;
+      gap: 20px;
       margin-bottom: 20px;
     }
-    
-    .stat-card i {
-      font-size: 2.5rem;
-      margin-bottom: 15px;
-      opacity: 0.9;
-    }
-    
-    .stat-card .number {
+
+    .patient-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
       font-size: 2rem;
-      font-weight: bold;
-      margin: 10px 0;
     }
-    
-    .stat-card .label {
+
+    .patient-details h4 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .patient-meta {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 10px;
+    }
+
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      color: var(--gray);
       font-size: 0.9rem;
-      opacity: 0.9;
     }
-    
-    .pending-tests { background: linear-gradient(45deg, #ff9a9e, #fad0c4); }
-    .completed-today { background: linear-gradient(45deg, #a1c4fd, #c2e9fb); }
-    .urgent-tests { background: linear-gradient(45deg, #ffecd2, #fcb69f); }
-    
-    .patient-card {
-      border-left: 5px solid var(--secondary);
+
+    .priority-badge {
+      background: var(--danger);
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
     }
-    
+
+    .patient-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
     .action-btn {
-      border-radius: 8px;
-      padding: 8px 15px;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
       font-weight: 500;
-      transition: all 0.3s;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
     }
-    
+
+    .primary-btn {
+      background: var(--primary);
+      color: white;
+    }
+
+    .outline-btn {
+      background: transparent;
+      border: 2px solid var(--border);
+      color: var(--gray);
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .primary-btn:hover {
+      background: var(--primary-dark);
+    }
+
+    .outline-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    /* Appointments List */
+    .appointments-list {
+      grid-column: 2;
+      grid-row: 1;
+    }
+
     .appointment-item {
-      border-left: 4px solid var(--secondary);
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 15px;
+      border-radius: 15px;
       margin-bottom: 12px;
-      padding: 12px 15px;
-      border-radius: 8px;
-      background: rgba(255, 255, 255, 0.8);
-      transition: all 0.3s;
+      background: rgba(248, 249, 250, 0.8);
+      transition: all 0.3s ease;
+      border-left: 4px solid var(--primary);
     }
-    
+
     .appointment-item:hover {
       background: white;
       transform: translateX(5px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-    
-    .activity-item {
-      padding: 10px 15px;
-      border-left: 3px solid var(--secondary);
-      margin-bottom: 10px;
-      background: rgba(255, 255, 255, 0.7);
-      border-radius: 8px;
-    }
-    
-    .navbar-custom {
-      background: rgba(44, 62, 80, 0.95);
-      backdrop-filter: blur(10px);
-      border-radius: 15px;
-      margin-bottom: 30px;
-      padding: 15px 25px;
-      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-    }
-    
-    .welcome-text {
+
+    .appointment-time {
+      background: var(--primary);
       color: white;
+      padding: 8px 12px;
+      border-radius: 10px;
       font-weight: 600;
-      font-size: 1.4rem;
+      min-width: 70px;
+      text-align: center;
     }
-    
+
+    .appointment-details {
+      flex: 1;
+    }
+
+    .appointment-details h5 {
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .appointment-details p {
+      color: var(--gray);
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    /* Charts Section */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 25px;
+      margin-bottom: 25px;
+    }
+
     .chart-container {
       position: relative;
-      height: 250px;
-      padding: 15px;
+      height: 300px;
     }
-    
-    .quick-actions {
+
+    /* Recent Activities */
+    .activities-list {
+      grid-column: 1 / -1;
+    }
+
+    .activity-item {
       display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 15px;
+      align-items: center;
+      gap: 15px;
+      padding: 15px;
+      border-radius: 15px;
+      margin-bottom: 10px;
+      background: rgba(248, 249, 250, 0.8);
+      transition: all 0.3s ease;
     }
-    
-    .quick-action-btn {
-      flex: 1;
-      min-width: 120px;
-      text-align: center;
-      padding: 12px 10px;
-      border-radius: 10px;
+
+    .activity-item:hover {
       background: white;
-      border: 1px solid #e0e0e0;
-      transition: all 0.3s;
-      text-decoration: none;
-      color: var(--dark);
+      transform: translateX(5px);
     }
-    
-    .quick-action-btn:hover {
-      background: var(--secondary);
+
+    .activity-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       color: white;
-      transform: translateY(-3px);
-      text-decoration: none;
+      font-size: 1rem;
     }
-    
-    .badge-urgent {
-      background: var(--danger);
-      color: white;
-      padding: 5px 10px;
-      border-radius: 20px;
-      font-size: 0.8rem;
+
+    .activity-success { background: var(--secondary); }
+    .activity-warning { background: var(--warning); }
+    .activity-info { background: var(--info); }
+
+    .activity-content {
+      flex: 1;
+    }
+
+    .activity-content p {
+      margin: 0;
+      font-weight: 500;
+    }
+
+    .activity-time {
+      color: var(--gray);
+      font-size: 0.85rem;
+    }
+
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .charts-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        transform: translateX(-100%);
+      }
+      
+      .main-content {
+        margin-left: 0;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container-fluid py-4">
+  <div class="dashboard-container">
     
-    <!-- Header Bar -->
-    <div class="navbar-custom d-flex justify-content-between align-items-center">
-      <div>
-        <h3 class="welcome-text mb-0">Welcome, <?= htmlspecialchars($technician_username) ?></h3>
-        <small class="text-light">Lab Technician Dashboard</small>
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <i class="fas fa-hospital-alt"></i>
+          <h3>MediLab Pro</h3>
+        </div>
       </div>
-      <div class="d-flex align-items-center">
-        <a href="manage_tests.php" class="btn btn-outline-light btn-sm me-2">
-          <i class="bi bi-clipboard-data"></i> Manage Tests
-        </a>
-        <a href="patient_search.php" class="btn btn-outline-light btn-sm me-2">
-          <i class="bi bi-search"></i> Find Patient
-        </a>
-        <a href="logout.php" class="btn btn-danger btn-sm">
-          <i class="bi bi-box-arrow-right"></i> Logout
-        </a>
+      
+      <div class="sidebar-menu">
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link active" href="#">
+              <i class="fas fa-tachometer-alt"></i>
+              <span>Dashboard</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="manage_tests.php">
+              <i class="fas fa-vial"></i>
+              <span>Test Management</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="patient_search.php">
+              <i class="fas fa-search"></i>
+              <span>Patient Search</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="reports.php">
+              <i class="fas fa-chart-bar"></i>
+              <span>Reports & Analytics</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="schedule.php">
+              <i class="fas fa-calendar-alt"></i>
+              <span>Schedule</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="inventory.php">
+              <i class="fas fa-boxes"></i>
+              <span>Inventory</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="settings.php">
+              <i class="fas fa-cog"></i>
+              <span>Settings</span>
+            </a>
+          </li>
+        </ul>
       </div>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="row">
-      <div class="col-md-4">
-        <div class="stat-card pending-tests">
-          <i class="fas fa-vial"></i>
-          <div class="number"><?= $pendingTestsCount ?></div>
-          <div class="label">Pending Tests</div>
+    <!-- Main Content -->
+    <div class="main-content">
+      
+      <!-- Top Bar -->
+      <div class="top-bar">
+        <div class="welcome-section">
+          <h1>Welcome back, <?= htmlspecialchars($technician_username) ?>! 👋</h1>
+          <p>Here's what's happening in your lab today</p>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="stat-card completed-today">
-          <i class="fas fa-check-circle"></i>
-          <div class="number"><?= $completedTodayCount ?></div>
-          <div class="label">Completed Today</div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="stat-card urgent-tests">
-          <i class="fas fa-exclamation-triangle"></i>
-          <div class="number"><?= $urgentTestsCount ?></div>
-          <div class="label">Urgent Tests</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row">
-      <!-- Next Patient -->
-      <div class="col-lg-4 col-md-6">
-        <div class="card dashboard-card patient-card">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Next Patient</span>
-            <?php if ($next): ?>
-              <span class="badge-urgent">UPCOMING</span>
-            <?php endif; ?>
+        
+        <div class="user-menu">
+          <div class="notification-badge">
+            <i class="fas fa-bell fa-lg" style="color: var(--gray);"></i>
+            <span class="badge-count">3</span>
           </div>
-          <div class="card-body">
-            <?php if ($next): ?>
-              <div class="d-flex align-items-center mb-3">
-                <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 50px; height: 50px;">
-                  <i class="fas fa-user text-white"></i>
-                </div>
-                <div>
-                  <h5 class="mb-1"><?= htmlspecialchars($next['full_name']) ?></h5>
-                  <p class="mb-1 text-muted"><?= htmlspecialchars($next['test_name']) ?></p>
-                  <small class="text-primary">
-                    <i class="bi bi-clock"></i> <?= date("H:i", strtotime($next['preferred_date'])) ?>
-                  </small>
-                </div>
-              </div>
-              
-              <div class="quick-actions">
-                <a href="view_details.php?id=<?= $next['id'] ?>" class="quick-action-btn">
-                  <i class="bi bi-eye"></i> Details
-                </a>
-                <a href="contact_patient.php?id=<?= $next['patient_id'] ?>" class="quick-action-btn">
-                  <i class="bi bi-telephone"></i> Contact
-                </a>
-                <a href="start_test.php?id=<?= $next['id'] ?>" class="quick-action-btn">
-                  <i class="bi bi-play-circle"></i> Start Test
-                </a>
-              </div>
-            <?php else: ?>
-              <div class="text-center py-4">
-                <i class="fas fa-user-clock fa-3x text-muted mb-3"></i>
-                <p class="text-muted">No upcoming patients scheduled.</p>
-              </div>
-            <?php endif; ?>
+          <div class="dropdown">
+            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+              <i class="fas fa-user-circle me-2"></i>
+              <?= htmlspecialchars($technician_username) ?>
+            </button>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="profile.php"><i class="fas fa-user me-2"></i>Profile</a></li>
+              <li><a class="dropdown-item" href="settings.php"><i class="fas fa-cog me-2"></i>Settings</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" href="logout.php"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+            </ul>
           </div>
         </div>
       </div>
 
-      <!-- Upcoming Appointments -->
-      <div class="col-lg-4 col-md-6">
-        <div class="card dashboard-card">
-          <div class="card-header">Upcoming Appointments</div>
-          <div class="card-body">
-            <?php if (!empty($appointments)): ?>
-              <?php foreach ($appointments as $row): ?>
-                <div class="appointment-item">
-                  <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                      <strong><?= htmlspecialchars($row['full_name']) ?></strong>
-                      <div class="small text-muted"><?= htmlspecialchars($row['test_name']) ?></div>
-                      <div class="small text-primary">
-                        <i class="bi bi-clock"></i> <?= date("H:i", strtotime($row['preferred_date'])) ?>
-                      </div>
-                    </div>
-                    <div class="dropdown">
-                      <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                        <i class="bi bi-three-dots"></i>
-                      </button>
-                      <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="view_details.php?id=<?= $row['id'] ?>">View Details</a></li>
-                        <li><a class="dropdown-item" href="contact_patient.php?id=<?= $row['patient_id'] ?>">Contact</a></li>
-                        <li><a class="dropdown-item" href="start_test.php?id=<?= $row['id'] ?>">Start Test</a></li>
-                      </ul>
-                    </div>
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card pending">
+          <div class="stat-icon">
+            <i class="fas fa-vial"></i>
+          </div>
+          <div class="stat-content">
+            <h3><?= $pendingTestsCount ?></h3>
+            <p>Pending Tests</p>
+            <div class="trend up">
+              <i class="fas fa-arrow-up"></i>
+              <span>12% from yesterday</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="stat-card completed">
+          <div class="stat-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-content">
+            <h3><?= $completedTodayCount ?></h3>
+            <p>Completed Today</p>
+            <div class="trend up">
+              <i class="fas fa-arrow-up"></i>
+              <span>8% from yesterday</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="stat-card urgent">
+          <div class="stat-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <div class="stat-content">
+            <h3><?= $urgentTestsCount ?></h3>
+            <p>Urgent Tests</p>
+            <div class="trend down">
+              <i class="fas fa-arrow-down"></i>
+              <span>5% from yesterday</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Grid -->
+      <div class="dashboard-grid">
+        
+        <!-- Next Patient -->
+        <div class="grid-card next-patient">
+          <div class="card-header">
+            <h3>Next Patient</h3>
+            <?php if ($next): ?>
+              <span class="priority-badge">UPCOMING</span>
+            <?php endif; ?>
+          </div>
+          
+          <?php if ($next): ?>
+            <div class="patient-info">
+              <div class="patient-avatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div class="patient-details">
+                <h4><?= htmlspecialchars($next['full_name']) ?></h4>
+                <div class="patient-meta">
+                  <div class="meta-item">
+                    <i class="fas fa-id-card"></i>
+                    <span>ID: <?= htmlspecialchars($next['patient_id']) ?></span>
+                  </div>
+                  <div class="meta-item">
+                    <i class="fas fa-phone"></i>
+                    <span><?= htmlspecialchars($next['phone']) ?></span>
                   </div>
                 </div>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <div class="text-center py-4">
-                <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
-                <p class="text-muted">No appointments found.</p>
+                <p class="text-muted"><?= htmlspecialchars($next['test_name']) ?></p>
               </div>
-            <?php endif; ?>
-          </div>
+            </div>
+            
+            <div class="patient-actions">
+              <button class="action-btn primary-btn">
+                <i class="fas fa-play"></i>
+                Start Test
+              </button>
+              <button class="action-btn outline-btn">
+                <i class="fas fa-eye"></i>
+                View Details
+              </button>
+            </div>
+          <?php else: ?>
+            <div class="text-center py-5">
+              <i class="fas fa-user-clock fa-3x text-muted mb-3"></i>
+              <h5 class="text-muted">No upcoming patients</h5>
+              <p class="text-muted">All tests are completed for now</p>
+            </div>
+          <?php endif; ?>
         </div>
-      </div>
 
-      <!-- Recent Activities -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card dashboard-card">
-          <div class="card-header">Recent Activities</div>
-          <div class="card-body">
-            <?php if (!empty($recentActivities)): ?>
-              <?php foreach ($recentActivities as $activity): ?>
-                <div class="activity-item">
-                  <div class="d-flex justify-content-between">
-                    <div>
-                      <strong><?= htmlspecialchars($activity['action']) ?></strong>
-                      <div class="small text-muted"><?= htmlspecialchars($activity['patient_name'] ?? 'N/A') ?></div>
-                    </div>
-                    <div class="small text-muted">
-                      <?= date("H:i", strtotime($activity['timestamp'])) ?>
-                    </div>
+        <!-- Upcoming Appointments -->
+        <div class="grid-card appointments-list">
+          <div class="card-header">
+            <h3>Upcoming Appointments</h3>
+            <a href="schedule.php" class="view-all">View All</a>
+          </div>
+          
+          <?php if (!empty($appointments)): ?>
+            <?php foreach ($appointments as $appointment): ?>
+              <div class="appointment-item">
+                <div class="appointment-time">
+                  <?= date("H:i", strtotime($appointment['preferred_date'])) ?>
+                </div>
+                <div class="appointment-details">
+                  <h5><?= htmlspecialchars($appointment['full_name']) ?></h5>
+                  <p><?= htmlspecialchars($appointment['test_name']) ?></p>
+                </div>
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i>
+                  </button>
+                  <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="view_details.php?id=<?= $appointment['id'] ?>">View Details</a></li>
+                    <li><a class="dropdown-item" href="contact_patient.php?id=<?= $appointment['patient_id'] ?>">Contact</a></li>
+                    <li><a class="dropdown-item" href="start_test.php?id=<?= $appointment['id'] ?>">Start Test</a></li>
+                  </ul>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <div class="text-center py-4">
+              <i class="fas fa-calendar-times fa-2x text-muted mb-3"></i>
+              <p class="text-muted">No appointments scheduled</p>
+            </div>
+          <?php endif; ?>
+        </div>
+
+        <!-- Recent Activities -->
+        <div class="grid-card activities-list">
+          <div class="card-header">
+            <h3>Recent Activities</h3>
+            <a href="activities.php" class="view-all">View All</a>
+          </div>
+          
+          <?php if (!empty($recentActivities)): ?>
+            <?php foreach ($recentActivities as $activity): ?>
+              <div class="activity-item">
+                <div class="activity-icon activity-success">
+                  <i class="fas fa-vial"></i>
+                </div>
+                <div class="activity-content">
+                  <p><?= htmlspecialchars($activity['action']) ?></p>
+                  <div class="activity-time">
+                    <?= date("M j, H:i", strtotime($activity['timestamp'])) ?>
                   </div>
                 </div>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <div class="text-center py-4">
-                <i class="fas fa-history fa-3x text-muted mb-3"></i>
-                <p class="text-muted">No recent activities.</p>
               </div>
-            <?php endif; ?>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Charts Section -->
-    <div class="row mt-4">
-      <!-- Bar Chart -->
-      <div class="col-lg-4 col-md-6">
-        <div class="card dashboard-card">
-          <div class="card-header">Appointments Per Hour</div>
-          <div class="card-body">
-            <div class="chart-container">
-              <canvas id="barChart"></canvas>
+            <?php endforeach; ?>
+          <?php else: ?>
+            <div class="text-center py-4">
+              <i class="fas fa-history fa-2x text-muted mb-3"></i>
+              <p class="text-muted">No recent activities</p>
             </div>
-          </div>
+          <?php endif; ?>
         </div>
       </div>
 
-      <!-- Line Chart -->
-      <div class="col-lg-4 col-md-6">
-        <div class="card dashboard-card">
-          <div class="card-header">Patient Traffic</div>
-          <div class="card-body">
-            <div class="chart-container">
-              <canvas id="lineChart"></canvas>
-            </div>
+      <!-- Charts Section -->
+      <div class="charts-grid">
+        
+        <!-- Appointments Chart -->
+        <div class="grid-card">
+          <div class="card-header">
+            <h3>Appointments Today</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="barChart"></canvas>
           </div>
         </div>
-      </div>
 
-      <!-- Gender Pie Chart -->
-      <div class="col-lg-4 col-md-12">
-        <div class="card dashboard-card">
-          <div class="card-header">Gender Overview</div>
-          <div class="card-body">
-            <div class="chart-container">
-              <canvas id="pieChart"></canvas>
-            </div>
+        <!-- Weekly Trend -->
+        <div class="grid-card">
+          <div class="card-header">
+            <h3>Weekly Trend</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="lineChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Gender Distribution -->
+        <div class="grid-card">
+          <div class="card-header">
+            <h3>Gender Distribution</h3>
+          </div>
+          <div class="chart-container">
+            <canvas id="pieChart"></canvas>
           </div>
         </div>
       </div>
@@ -456,81 +916,105 @@ if ($activitiesQuery) {
   <!-- Bootstrap & Chart Scripts -->
   <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
   <script>
-    // Bar Chart
+    // Bar Chart - Appointments per hour
     const ctx1 = document.getElementById('barChart').getContext('2d');
     new Chart(ctx1, {
       type: 'bar',
       data: {
         labels: <?= json_encode($hours) ?>,
         datasets: [{
-          label: 'Appointments Per Hour',
+          label: 'Appointments',
           data: <?= json_encode($data) ?>,
-          backgroundColor: '#3498db',
-          borderColor: '#2980b9',
-          borderWidth: 1,
-          borderRadius: 5
+          backgroundColor: 'rgba(26, 115, 232, 0.8)',
+          borderColor: 'rgba(26, 115, 232, 1)',
+          borderWidth: 2,
+          borderRadius: 8,
+          borderSkipped: false,
         }]
-      },
-      options: { 
-        responsive: true, 
-        maintainAspectRatio: false,
-        scales: { 
-          y: { 
-            beginAtZero: true,
-            grid: { color: 'rgba(0,0,0,0.05)' }
-          },
-          x: {
-            grid: { display: false }
-          }
-        },
-        plugins: {
-          legend: { display: false }
-        }
-      }
-    });
-
-    // Line Chart
-    const ctx2 = document.getElementById('lineChart').getContext('2d');
-    new Chart(ctx2, {
-      type: 'line',
-      data: {
-        labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-        datasets: [
-          { 
-            label: 'New patients', 
-            data: [3, 4, 3, 5, 6], 
-            borderColor: '#e74c3c', 
-            backgroundColor: 'rgba(231, 76, 60, 0.1)',
-            borderWidth: 2,
-            tension: 0.3,
-            fill: true
-          },
-          { 
-            label: 'Returning', 
-            data: [2, 3, 4, 2, 3], 
-            borderColor: '#3498db', 
-            backgroundColor: 'rgba(52, 152, 219, 0.1)',
-            borderWidth: 2,
-            tension: 0.3,
-            fill: true
-          }
-        ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            titleFont: { size: 14 },
+            bodyFont: { size: 13 },
+            padding: 12,
+            cornerRadius: 8
+          }
+        },
         scales: {
           y: {
-            grid: { color: 'rgba(0,0,0,0.05)' }
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            },
+            ticks: {
+              font: { size: 11 }
+            }
           },
           x: {
-            grid: { display: false }
+            grid: {
+              display: false
+            },
+            ticks: {
+              font: { size: 11 }
+            }
           }
         }
       }
     });
 
-    // Pie Chart
+    // Line Chart - Weekly trend
+    const ctx2 = document.getElementById('lineChart').getContext('2d');
+    new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: <?= json_encode($weeklyData['labels']) ?>,
+        datasets: [{
+          label: 'Appointments',
+          data: <?= json_encode($weeklyData['data']) ?>,
+          borderColor: 'rgba(52, 168, 83, 1)',
+          backgroundColor: 'rgba(52, 168, 83, 0.1)',
+          borderWidth: 3,
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: 'rgba(52, 168, 83, 1)',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 8
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(0, 0, 0, 0.05)'
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            }
+          }
+        }
+      }
+    });
+
+    // Pie Chart - Gender distribution
     const ctx3 = document.getElementById('pieChart').getContext('2d');
     new Chart(ctx3, {
       type: 'doughnut',
@@ -538,8 +1022,17 @@ if ($activitiesQuery) {
         labels: ['Male', 'Female', 'Other'],
         datasets: [{
           data: <?= json_encode(array_values($genderCounts)) ?>,
-          backgroundColor: ['#3498db', '#e91e63', '#ffc107'],
-          borderWidth: 0,
+          backgroundColor: [
+            'rgba(26, 115, 232, 0.8)',
+            'rgba(234, 67, 53, 0.8)',
+            'rgba(251, 188, 5, 0.8)'
+          ],
+          borderColor: [
+            'rgba(26, 115, 232, 1)',
+            'rgba(234, 67, 53, 1)',
+            'rgba(251, 188, 5, 1)'
+          ],
+          borderWidth: 2,
           hoverOffset: 15
         }]
       },
@@ -548,9 +1041,15 @@ if ($activitiesQuery) {
         maintainAspectRatio: false,
         plugins: {
           legend: {
-            position: 'bottom'
+            position: 'bottom',
+            labels: {
+              padding: 20,
+              usePointStyle: true,
+              pointStyle: 'circle'
+            }
           }
-        }
+        },
+        cutout: '65%'
       }
     });
   </script>
